@@ -1,67 +1,59 @@
 from fastapi import FastAPI
 import uvicorn
+import pandas as pd
 
 app = FastAPI()
 
-# Mock product data based on your Excel data
-MOCK_PRODUCTS = {
-    "11dda71a-ec77-4d72-b6d4-1b869f727a9e": {
-        "id": "11dda71a-ec77-4d72-b6d4-1b869f727a9e",
-        "name": "Samsung Galaxy A55 5G2",
-        "category": "Smartphone",
-        "description": "Latest Samsung A-series smartphone with 5G capability",
-        "trademark_id": "7b8c08a0-a860-46ff-bdf1-952a32d973ea"
-    },
-    "77381ee5-6c1a-41a6-becf-d2def8e197e3": {
-        "id": "77381ee5-6c1a-41a6-becf-d2def8e197e3",
-        "name": "OPPO Reno12",
-        "category": "Smartphone",
-        "description": "OPPO Reno series with advanced camera features",
-        "trademark_id": "9be493a9-9f25-4861-a8f9-7a1c7e84eb3e"
-    },
-    "828a961c-c4aa-405d-bc9b-c9aa01cd473a": {
-        "id": "828a961c-c4aa-405d-bc9b-c9aa01cd473a",
-        "name": "Samsung Galaxy S23 8GB",
-        "category": "Smartphone",
-        "description": "Samsung flagship with 8GB RAM configuration",
-        "trademark_id": "7b8c08a0-a860-46ff-bdf1-952a32d973ea"
-    },
-    "9bffb182-abaa-43bf-bb86-4d99d2dfa5ed": {
-        "id": "9bffb182-abaa-43bf-bb86-4d99d2dfa5ed",
-        "name": "Sony Xperia",
-        "category": "Smartphone",
-        "description": "Sony's premium smartphone with advanced display",
-        "trademark_id": "c1021e5c-c2d9-424a-9b15-eb350d3f21a2"
-    },
-    "a15b85f1-cfba-4510-86fe-ef9cdf2b10a2": {
-        "id": "a15b85f1-cfba-4510-86fe-ef9cdf2b10a2",
-        "name": "Samsung Galaxy Z Flip5",
-        "category": "Smartphone",
-        "description": "Foldable smartphone with innovative design",
-        "trademark_id": "7b8c08a0-a860-46ff-bdf1-952a32d973ea"
-    },
-    "bd5b6aa1-69c6-4207-8642-8b5ceaf065ad": {
-        "id": "bd5b6aa1-69c6-4207-8642-8b5ceaf065ad",
-        "name": "Samsung Galaxy S23 Ultra",
-        "category": "Smartphone",
-        "description": "Premium flagship with S-Pen support",
-        "trademark_id": "7b8c08a0-a860-46ff-bdf1-952a32d973ea"
-    },
-    "c9de2a34-0b4a-4df5-9ac6-b5e3cde1ff95": {
-        "id": "c9de2a34-0b4a-4df5-9ac6-b5e3cde1ff95",
-        "name": "Samsung Galaxy S23U 8GB",
-        "category": "Smartphone",
-        "description": "Ultra model with 8GB RAM configuration",
-        "trademark_id": "7b8c08a0-a860-46ff-bdf1-952a32d973ea"
-    },
-    "dd55204d-7dcb-4598-982e-262c69767f50": {
-        "id": "dd55204d-7dcb-4598-982e-262c69767f50",
-        "name": "Samsung Galaxy A35 5G",
-        "category": "Smartphone",
-        "description": "Mid-range 5G smartphone with great value",
-        "trademark_id": "7b8c08a0-a860-46ff-bdf1-952a32d973ea"
-    }
-}
+def get_mock_products():
+    # Read data from Excel sheets
+    products_df = pd.read_excel('Data.xlsx', sheet_name='products (2)')
+    variants_df = pd.read_excel('Data.xlsx', sheet_name='products_variants (2)')
+    memories_df = pd.read_excel('Data.xlsx', sheet_name='memories (2)')
+    colors_df = pd.read_excel('Data.xlsx', sheet_name='colors (2)')
+    attributes_df = pd.read_excel('Data.xlsx', sheet_name='attributes (2)')
+    attribute_values_df = pd.read_excel('Data.xlsx', sheet_name='attribute_values (2)')
+    usage_categories_df = pd.read_excel('Data.xlsx', sheet_name='usage_categories (2)')
+
+    # Create mock products dictionary
+    MOCK_PRODUCTS = {}
+    
+    for _, product in products_df.iterrows():
+        product_id = product['id']
+        product_data = {
+            "id": product_id,
+            "name": product['name']
+        }
+        
+        # Get variants info
+        variants = variants_df[variants_df['product_id'] == product_id]
+        if not variants.empty:
+            # Get category
+            category_id = variants['usage_category_id'].iloc[0]
+            category_info = usage_categories_df[usage_categories_df['id'] == category_id]['name'].iloc[0]
+            product_data['category'] = category_info
+            
+            # Get variant details
+            variant_details_df = pd.read_excel('Data.xlsx', sheet_name='product_variant_details (2)')
+            variant_details = variant_details_df[variant_details_df['product_variant_id'].isin(variants['id'])]
+            
+            # Get memory and color info
+            memory_info = memories_df[memories_df['id'].isin(variant_details['memory_id'])]['id'].tolist()
+            color_info = colors_df[colors_df['id'].isin(variant_details['color_id'])]['id'].tolist()
+            product_data['memories'] = ', '.join(str(m) for m in memory_info)
+            product_data['colors'] = ', '.join(str(c) for c in color_info)
+
+            # Get attribute values
+            product_attributes = attribute_values_df[attribute_values_df['product_variant_id'].isin(variants['id'])]
+            for _, attr in product_attributes.iterrows():
+                attr_name = attributes_df[attributes_df['id'] == attr['attribute_id']]['name'].iloc[0]
+                product_data[attr_name.lower()] = attr['value']
+
+        MOCK_PRODUCTS[product_id] = product_data
+
+    return MOCK_PRODUCTS
+
+# Initialize mock products
+MOCK_PRODUCTS = get_mock_products()
 
 @app.get("/products/{product_id}")
 async def get_product(product_id: str):
