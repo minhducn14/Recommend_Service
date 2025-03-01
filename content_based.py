@@ -101,7 +101,7 @@ def content_based_filtering(db, customer_id, top_n=5):
 
     # 📌 4. Gợi ý sản phẩm có mô tả giống với sản phẩm mà user đã xem
     indices = pd.Series(df.index, index=df['id'])
-    recommended_products = cosine_sim[indices[df["id"].iloc[0]]].argsort()[-(top_n+1):-1][::-1]
+    recommended_products = cosine_sim[indices[df["id"].iloc[0]]].argsort()[-top_n:][::-1]
 
     return df['id'].iloc[recommended_products].tolist()
 
